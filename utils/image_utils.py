@@ -20,6 +20,7 @@ class ImageUtils:
         #   (3, height, width) => (height, width, 3)
         image = torch.reshape(image, (image.shape[2], image.shape[1], image.shape[0]))
         # Detach Torch:
+        image = image.to("cpu")
         image = image.detach().numpy()
         # Plot the image:
         plt.imshow(image)

@@ -1,2 +1,2 @@
 from .unets import UNet2D
-from .training import TrainingConfig, MasterModel
+from .master_model import MasterModel, TrainingConfig
