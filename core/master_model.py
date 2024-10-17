@@ -12,7 +12,7 @@ from utils import ImageDataset, log_info, TrainingConfig
 class MasterModel:
     @log_info()
     def __init__(self, model, training_config: TrainingConfig, train_dataset: ImageDataset,
-                 lr_scheduler=None, sampler=None, stub_path=None):
+                 val_dataset: ImageDataset = None, lr_scheduler=None, sampler=None, stub_path=None):
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Main Initialization ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Instance variables:
         self.model = model
@@ -20,10 +20,13 @@ class MasterModel:
         self.sampler = (sampler if sampler is not None else
                         DDPMScheduler(num_train_timesteps=self.training_config.num_train_timesteps))
         self.train_dataset: ImageDataset = train_dataset
+        self.val_dataset: ImageDataset = val_dataset
         self.stub_path = stub_path
         # Initializing DataLoader using ImageDataset provided:
         self.train_dataloader: DataLoader = DataLoader(self.train_dataset,
                                                        batch_size=self.training_config.train_batch_size)
+        self.val_dataloader: DataLoader = DataLoader(self.val_dataset,
+                                                     batch_size=self.training_config.train_batch_size)
         # Initializing optimizer (AdamW):
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.training_config.learning_rate)
         self.lr_scheduler = lr_scheduler if lr_scheduler is not None else \
@@ -118,12 +121,14 @@ class MasterModel:
 
                 # Propagation loop:
                 with self.accelerator.accumulate(self.model):
-                    prediction = self.model(noisy_batch, timesteps, return_dict=False)[0]
+                    prediction = self.model(noisy_batch, timesteps, return_dict=True).sample
                     loss = F.mse_loss(prediction, label)
                     self.accelerator.backward(loss)
 
                     # Printing information:
                     if (global_step % 10 == 0) and print_enabled:
+                        if self.training_config.train_batch_size == 1:
+                            print(f"Noised timesteps: {timesteps.item()}")
                         print(f"Loss at step {global_step}: {loss.item()}")
 
                     # Stepping the optimizer and resetting gradients:
@@ -150,13 +155,41 @@ class MasterModel:
         timestep = timestep.to(dtype=torch.int64, device=device)
         x = x.to(device=device)
         # Predict (noise):
-        noise_prediction = self.model(x, timestep).sample
+        noise_prediction = self.model(x, timestep, return_dict=True).sample
 
         # If we want to return the denoised prediction:
         if predict_denoised:
             denoised_prediction = self.sampler.step(model_output=noise_prediction,
                                                     timestep=int(timestep.item()),
                                                     sample=x,
-                                                    return_dict=False)[0]
+                                                    return_dict=True).prev_sample
             return denoised_prediction
         return noise_prediction
+
+    def validate(self, val_dataloader=None, device="cpu"):
+        if val_dataloader is None:
+            val_dataloader = self.val_dataloader
+        # Iterate over batches of the validation set:
+        for _, batch in enumerate(val_dataloader):
+            # Get clean images:
+            clean_batch = batch.to(device=device)
+            batch_size = clean_batch.shape[0]
+            # Sample random set of timesteps:
+            timesteps = torch.randint(low=0,
+                                      high=self.sampler.config["num_train_timesteps"],
+                                      size=(batch_size,),
+                                      device=clean_batch.device,
+                                      dtype=torch.int64).long()
+
+            # Sample noise and add it based on the timestep:
+            noise = torch.randn(clean_batch.shape, device=clean_batch.device)
+            noisy_batch = self.sampler.add_noise(clean_batch, noise, timesteps).to(device=clean_batch.device)
+
+            # Run prediction:
+            with torch.no_grad():
+                label = noise
+                prediction = self.model(noisy_batch, timesteps, return_dict=True).sample
+                loss = F.mse_loss(prediction, label)
+                print(f"Loss: {loss:.4f}")
+        return
+

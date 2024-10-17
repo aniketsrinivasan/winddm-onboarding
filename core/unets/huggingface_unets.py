@@ -6,7 +6,7 @@ class UNet2D(UNet2DModel):
                  image_size:tuple=(32, 32),
                  in_channels:int=3,
                  out_channels:int=3,
-                 block_out_channels:tuple=(128, 256, 512, 512),
+                 block_out_channels:tuple=(32, 64, 128, 256),
                  activation_function:str="silu",
                  attention_head_dimension:int=8,
                  norm_num_groups:int=8,

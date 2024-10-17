@@ -9,24 +9,25 @@ device = 'mps' if torch.backends.mps.is_available() else 'cpu'
 
 images = utils.ImageDataset(directory_path="pistachio_dataset/data/Kirmizi_Pistachio",
                             img_size=(32, 32))
-test_image = images[0].reshape(32, 32, 3).detach().numpy()
-plt.imshow(test_image)
-plt.show()
 
 
 model = UNet2D()
 training_config = TrainingConfig(num_train_epochs=1,
-                                 train_batch_size=8,
+                                 train_batch_size=1,
                                  output_dir="stubs/diffusion-pistachio-32")
 master_model = MasterModel(model=model.model,
                            training_config=training_config,
                            train_dataset=images,
-                           stub_path="stubs/diffusion-pistachio-32/model_trained_3")
-master_model.train(save_name="model_trained_3", print_enabled=True)
+                           stub_path="stubs/diffusion-pistachio-32/model_trained_4")
+master_model.train(save_name="model_trained_5", print_enabled=True)
 
-start_denoise_step = 100
-num_denoising_steps = 100
+start_denoise_step = 999
+num_denoising_steps = 250
 denoising_step = - start_denoise_step // num_denoising_steps
+
+timestep_list = list(range(start_denoise_step, 0, denoising_step))
+master_model.sampler.set_timesteps(timesteps=timestep_list)
+
 this_image = images[0].unsqueeze(0).to(dtype=torch.float32)
 print(this_image)
 img, _ = utils.ImageUtils.plot_torch(this_image)
@@ -41,12 +42,14 @@ img, _ = utils.ImageUtils.plot_torch(noisy)
 print(img)
 denoised = master_model.sampler.add_noise(this_image, noise, torch.Tensor([start_denoise_step]).long())
 # Denoising loop
+count = 0
 for i in range(start_denoise_step, 0, denoising_step):
-    if i % (10 * denoising_step) == 0:
+    if (count % 10 == 0):
         denoised_img, _ = utils.ImageUtils.plot_torch(denoised)
     denoised = master_model.forward(noisy, torch.Tensor([i]), predict_denoised=True, device=device)
     print(i, denoised.shape)
     noisy = denoised
+    count += 1
 
 denoised_img, _ = utils.ImageUtils.plot_torch(denoised)
 print(denoised.shape)
