@@ -14,17 +14,17 @@ val_images = utils.ImageDataset(directory_path="pistachio_dataset/data/Siirt_Pis
 
 
 model = UNet2D()
-training_config = TrainingConfig(num_train_epochs=2)
+training_config = TrainingConfig(num_train_epochs=0)
 master_model = MasterModel(model=model.model,
                            training_config=training_config,
                            train_dataset=images,
                            val_dataset=val_images,
-                           stub_path="stubs/diffusion-pistachio-32/model_trained_4")
+                           stub_path="stubs/diffusion-pistachio-32/model_trained_5")
 # master_model.train(save_name="model_trained_3")
 
 
 start_denoise_step = 200
-num_denoising_steps = 2
+num_denoising_steps = 150
 denoising_step = - start_denoise_step // num_denoising_steps
 
 this_image = images[0].unsqueeze(0).to(dtype=torch.float32)
@@ -52,4 +52,4 @@ for i in range(start_denoise_step, 0, denoising_step):
 denoised_img, _ = utils.ImageUtils.plot_torch(denoised)
 print(denoised.shape)
 
-master_model.validate(device=device)
+# master_model.validate(device=device)

@@ -3,8 +3,8 @@ import cv2 as cv
 import os
 import functools
 from transformers import TrainingArguments
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
+from torch.utils.data import Dataset
+from torchvision import transforms
 from .core_utils import log_info
 
 
@@ -15,7 +15,7 @@ class TrainingConfig:
                  num_train_epochs:int=1,
                  num_train_timesteps:int=1000,
                  gradient_accumulation_steps:int=1,
-                 learning_rate:float=1e-4,
+                 learning_rate:float=1e-5,
                  learning_warmup_ratio:float=0.2,
                  output_dir:str="stubs/diffusion-pepe-256",
                  save_model_epochs:int=1,
@@ -78,7 +78,7 @@ def directory_to_tensor(directory_path: str, img_size:tuple=(256, 256),
             try:
                 this_image = transform(this_image)            # custom transform
             except Exception as e:
-                print(f"Could not transform {image_path} in {__qualname__}: {e}")
+                print(f"Could not transform {image_path} in directory_to_tensor(): {e}")
         images.append(this_image)                             # append to collection
 
     # Convert image collection to a torch.Tensor:
@@ -106,11 +106,18 @@ class ImageStack:
         return self.data_tensor[idx]
 
 
+def _normalization_transform(tensor: torch.Tensor) -> torch.Tensor:
+    mean = torch.mean(tensor.float())
+    std = torch.std(tensor.float())
+    return transforms.Normalize(mean=mean, std=std)(tensor.float())
+
+
 # Wrapper class inheriting from Dataset (Torch).
 class ImageDataset(Dataset):
     @log_info(log_path="logs/testing", log_enabled=False, print_enabled=True, display_args=True)
     # log_info(__init__, log_path="logs
-    def __init__(self, directory_path: str, img_size:tuple=(256, 256), image_transform=None):
+    def __init__(self, directory_path: str, img_size:tuple=(256, 256),
+                 image_transform=_normalization_transform):
         # Store information in an ImageStack object:
         self.image_stack = ImageStack(directory_path=directory_path,
                                       img_size=img_size,

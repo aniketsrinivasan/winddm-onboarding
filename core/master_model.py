@@ -4,7 +4,7 @@ from tqdm.auto import tqdm
 from accelerate import Accelerator
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
-from diffusers import DDPMScheduler
+from diffusers import DDPMScheduler, DDIMScheduler, EulerDiscreteScheduler
 from diffusers.optimization import get_cosine_schedule_with_warmup
 from utils import ImageDataset, log_info, TrainingConfig
 
@@ -24,7 +24,8 @@ class MasterModel:
         self.stub_path = stub_path
         # Initializing DataLoader using ImageDataset provided:
         self.train_dataloader: DataLoader = DataLoader(self.train_dataset,
-                                                       batch_size=self.training_config.train_batch_size)
+                                                       batch_size=self.training_config.train_batch_size,
+                                                       shuffle=True)
         self.val_dataloader: DataLoader = DataLoader(self.val_dataset,
                                                      batch_size=self.training_config.train_batch_size)
         # Initializing optimizer (AdamW):
@@ -152,15 +153,23 @@ class MasterModel:
 
     def forward(self, x: torch.Tensor, timestep: torch.Tensor, predict_denoised=False, device="cpu"):
         # Convert timestep to IntTensor:
-        timestep = timestep.to(dtype=torch.int64, device=device)
+        if not isinstance(self.sampler, EulerDiscreteScheduler):
+            timestep = torch.Tensor([timestep])
+            timestep = timestep.to(dtype=torch.int64, device=device)
+        timestep = timestep.to(device=device)
         x = x.to(device=device)
         # Predict (noise):
         noise_prediction = self.model(x, timestep, return_dict=True).sample
 
         # If we want to return the denoised prediction:
         if predict_denoised:
+            if not isinstance(self.sampler, EulerDiscreteScheduler):
+                timestep_int = int(timestep.item())
+            else:
+                timestep_int = timestep
+                self.sampler.scale_model_input(x, timestep_int)
             denoised_prediction = self.sampler.step(model_output=noise_prediction,
-                                                    timestep=int(timestep.item()),
+                                                    timestep=timestep_int,
                                                     sample=x,
                                                     return_dict=True).prev_sample
             return denoised_prediction

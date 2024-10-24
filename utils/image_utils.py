@@ -5,6 +5,7 @@ import torch
 class ImageUtils:
     @staticmethod
     def plot_torch(image: torch.Tensor) -> tuple:
+        image = image.clone()
         # If the image has shape greater than 3:
         if len(image.shape) > 3:
             try:
