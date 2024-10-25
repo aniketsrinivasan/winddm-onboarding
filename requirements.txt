@@ -1,0 +1,8 @@
+diffusers~=0.30.3
+torch~=2.4.1
+tqdm~=4.66.5
+accelerate~=1.0.0
+matplotlib~=3.9.2
+opencv-python~=4.10.0.84
+transformers~=4.45.2
+torchvision~=0.19.1

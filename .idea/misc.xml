@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.11 (windDM-diffusers)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Remote Python 3.10.12 (sftp://a3sriniv@watgpu.cs.uwaterloo.ca:22/u4/a3sriniv/pycharm_projects/bin/python)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.11 (windDM-diffusers)" project-jdk-type="Python SDK" />
 </project>
